@@ -1,0 +1,48 @@
+# LiteLLM gateway. The app calls one OpenAI-compatible endpoint with a logical model alias;
+# everything provider-specific lives here.
+
+model_list:
+  # Local model via Ollama: free, no rate limits. Needs `ollama serve` and `ollama pull llama3.1`.
+  - model_name: chat-default
+    litellm_params:
+      model: ollama_chat/llama3.1
+      api_base: os.environ/OLLAMA_API_BASE
+      num_ctx: 16384 # Ollama's working context; its default is far below llama3.1's 131k max.
+                     # Keep chatbot.model-context-tokens in application.yml equal to this.
+      timeout: 120   # local inference is slower than a hosted API
+  # Gemini (free tier hits rate limits). To switch back, uncomment this, remove the Ollama entry
+  # above, and set GEMINI_API_KEY in .env.
+  # - model_name: chat-default
+  #   litellm_params:
+  #     model: gemini/gemini-3.6-flash
+  #     api_key: os.environ/GEMINI_API_KEY
+  #     timeout: 30
+
+  # Fallback on errors, timeouts or rate limits: a different vendor, so one provider's outage
+  # doesn't take the bot down. Uncomment this and router_settings below, and set ANTHROPIC_API_KEY.
+  # - model_name: chat-fallback
+  #   litellm_params:
+  #     model: anthropic/claude-haiku-4-5
+  #     api_key: os.environ/ANTHROPIC_API_KEY
+  #     timeout: 30
+
+# router_settings:
+#   num_retries: 1
+#   fallbacks:
+#     - chat-default: ["chat-fallback"]
+
+litellm_settings:
+  drop_params: true            # ignore OpenAI-only params a provider doesn't support
+  callbacks: ["langfuse_otel"] # every call -> Langfuse trace; scripts/gateway.sh drops this without keys
+
+# Generic guardrails every app behind this gateway gets: PII masking and a prompt-injection block,
+# run before any provider sees the request. App-specific checks live in the app's GuardrailPlugin.
+guardrails:
+  - guardrail_name: support-bot-guard
+    litellm_params:
+      guardrail: custom_guard.SupportBotGuardrail
+      mode: pre_call
+      default_on: true
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

@@ -1,0 +1,10 @@
+target/
+data/*.db
+.env
+gateway/.litellm-config.no-tracing.yaml
+__pycache__/
+.idea/
+.vscode/
+*.iml
+.DS_Store
+.github/
